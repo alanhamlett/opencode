@@ -6,6 +6,7 @@ import {
   define,
   get,
   hidden,
+  Arguments,
   Arr,
   GeneratorObj,
   hostIterator,
@@ -119,7 +120,7 @@ export const arrayGlobal = <R>(ctx: Interpreter<R>) => {
     construct: (args, newTarget) => Effect.sync(() => construct(args, prototypeFrom(newTarget, proto))),
   })
   methods(builtins, array, [
-    ["isArray", 1, (_, args) => args[0] instanceof Arr],
+    ["isArray", 1, (_, args) => args[0] instanceof Arr && !(args[0] instanceof Arguments)],
     ["of", 0, (_, args) => wrap([...args])],
     ["from", 1, (_, args) => arrayFrom(ctx, args)],
   ])

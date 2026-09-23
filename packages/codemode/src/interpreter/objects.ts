@@ -94,7 +94,7 @@ export class Obj {
 }
 
 export class Arr extends Obj {
-  override readonly tag = "Array"
+  override readonly tag: string = "Array"
   /** The attributes every live element shares; `seal` and `freeze` narrow them since elements have no slots. */
   elements: Attributes = data
   constructor(
@@ -168,10 +168,17 @@ export class Fn extends Callable {
     readonly capturedScopes: Array<Map<string, Binding>>,
     readonly async: boolean,
     readonly generator: boolean,
+    /** Arrows have no `this` or `arguments` of their own; they read the enclosing function's. */
+    readonly arrow: boolean,
   ) {
     const optional = parameters.findIndex((p) => p.type === "AssignmentPattern" || p.type === "RestElement")
     super(proto, name, optional === -1 ? parameters.length : optional)
   }
+}
+
+/** The strict `arguments` object: an unmapped copy of the call's arguments that is not an Array. */
+export class Arguments extends Arr {
+  override readonly tag = "Arguments"
 }
 
 export type NativeCall<R> = (thisValue: Value, args: Array<Value>) => Effect.Effect<Value, unknown, R>
