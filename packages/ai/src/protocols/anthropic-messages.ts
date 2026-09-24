@@ -38,6 +38,7 @@ const ADAPTER = "anthropic-messages"
 export const DEFAULT_BASE_URL = "https://api.anthropic.com/v1"
 export const PATH = "/messages"
 export const DEFAULT_MAX_TOKENS = 32_000
+const MIN_THINKING_BUDGET = 1_024
 const DEFAULT_EFFORT = "high"
 
 const SSE_EVENTS = new Set([
@@ -1027,6 +1028,13 @@ const applyThinkingBindingDefault = (model: LLMRequest["model"], thinking: Anthr
   }
 }
 
+// Anthropic requires the thinking budget below `max_tokens`, which callers may fit to the room left in the context
+// window. The budget cannot go under Anthropic's minimum.
+const fitThinkingBudget = (thinking: AnthropicThinking | undefined, maxTokens: number) =>
+  thinking?.type === "enabled" && thinking.budget_tokens >= maxTokens
+    ? { ...thinking, budget_tokens: Math.max(MIN_THINKING_BUDGET, maxTokens - 1) }
+    : thinking
+
 const fromRequest = Effect.fn("AnthropicMessages.fromRequest")(function* (request: LLMRequest) {
   const options = yield* decodeOptions(request.providerOptions ?? {})
   const management = options.contextManagement
@@ -1064,6 +1072,7 @@ const fromRequest = Effect.fn("AnthropicMessages.fromRequest")(function* (reques
   }
   const output_config =
     updates.effort === undefined && format === undefined ? undefined : { effort: updates.effort, format }
+  const maxTokens = generation?.maxTokens ?? DEFAULT_MAX_TOKENS
   const body = {
     model: request.model.id,
     system,
@@ -1071,12 +1080,12 @@ const fromRequest = Effect.fn("AnthropicMessages.fromRequest")(function* (reques
     tools,
     tool_choice: toolChoice,
     stream: true as const,
-    max_tokens: generation?.maxTokens ?? DEFAULT_MAX_TOKENS,
+    max_tokens: maxTokens,
     temperature: generation?.temperature,
     top_p: generation?.topP,
     top_k: generation?.topK,
     stop_sequences: generation?.stop,
-    thinking: applyThinkingBindingDefault(request.model, options.thinking),
+    thinking: applyThinkingBindingDefault(request.model, fitThinkingBudget(options.thinking, maxTokens)),
     output_config,
     // top-level passthrough per SDK MessageCreateParamsBase:4638,4643,4649,4654,4670
     cache_control: options.cache_control ?? options.cacheControl,

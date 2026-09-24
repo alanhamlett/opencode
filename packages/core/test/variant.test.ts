@@ -175,9 +175,14 @@ test("spells Chat Completions variants for direct providers", () => {
     ]),
   ).toEqual([
     { id: "none", settings: { enableThinking: false } },
-    { id: "high", settings: { enableThinking: true, thinkingBudget: 131_072 } },
-    { id: "max", settings: { enableThinking: true, thinkingBudget: 262_144 } },
+    { id: "thinking", settings: { enableThinking: true } },
   ])
+
+  expect(
+    resolve(model("@opencode/ai/providers/openrouter", "qwen/qwen3.8-flash", 131_072), [
+      { type: "budget_tokens", min: 0 },
+    ]),
+  ).toEqual([])
 
   expect(
     resolve(model("@opencode/ai/providers/zai/chat", "glm-5.3"), [

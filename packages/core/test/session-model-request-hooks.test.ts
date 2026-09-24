@@ -154,3 +154,53 @@ describe("SessionModelRequest HTTP hooks", () => {
     }),
   )
 })
+
+describe("SessionModelRequest output limit", () => {
+  const input = { session, agent: Agent.ID.make("build"), model, system: [], messages: [] }
+
+  it.effect("caps the default output limit per request kind", () =>
+    Effect.gen(function* () {
+      const requests = yield* SessionModelRequest.Service.pipe(Effect.provide(SessionModelRequest.layer))
+      const large = {
+        ...input,
+        model: SessionRunnerModel.resolved(OpenAIChat.route.model({ id: "large-output", provider: "test" }), {
+          capabilities: { tools: true, input: ["text"], output: ["text"] },
+          cost: [],
+          limit: { context: 1_000_000, output: 384_000 },
+        }),
+      }
+      const maxTokens = (prepared: SessionModelRequest.Prepared<unknown>) => prepared.request.generation?.maxTokens
+      expect([
+        maxTokens(yield* requests.primary(large)),
+        maxTokens(yield* requests.compaction(large)),
+        maxTokens(yield* requests.title(large)),
+        maxTokens(yield* requests.generate(large)),
+      ]).toEqual([256_000, 32_000, undefined, undefined])
+      expect(maxTokens(yield* requests.primary({ ...input, inputTokens: 180_000 }))).toBe(15_904)
+      expect(maxTokens(yield* requests.compaction({ ...input, inputTokens: 180_000 }))).toBe(15_904)
+    }).pipe(Effect.provideService(SessionModelTransport.Service, transport)),
+  )
+
+  it.effect("lets hooks change or remove the default output limit", () =>
+    Effect.gen(function* () {
+      const hooks = yield* PluginHooks.Service
+      const seen: Array<number | undefined> = []
+      yield* hooks.register("session", "context", (event) =>
+        Effect.sync(() => {
+          seen.push(event.options.maxTokens)
+          delete event.options.maxTokens
+        }),
+      )
+      yield* hooks.register("session", "title", (event) =>
+        Effect.sync(() => {
+          event.options.maxTokens = 100
+        }),
+      )
+      const requests = yield* SessionModelRequest.Service.pipe(Effect.provide(SessionModelRequest.layer))
+
+      expect((yield* requests.primary(input)).request.generation).toBeUndefined()
+      expect((yield* requests.title(input)).request.generation?.maxTokens).toBe(100)
+      expect(seen).toEqual([32_000])
+    }).pipe(Effect.provideService(SessionModelTransport.Service, transport)),
+  )
+})

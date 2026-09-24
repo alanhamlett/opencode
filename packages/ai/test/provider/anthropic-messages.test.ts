@@ -148,11 +148,13 @@ describe("Anthropic Messages route", () => {
     Effect.gen(function* () {
       const enabled = yield* compileRequest(
         LLMRequest.update(request, {
+          generation: { maxTokens: 4_096 },
           providerOptions: { thinking: { type: "enabled", budgetTokens: 1_024 } },
         }),
       )
       const legacy = yield* compileRequest(
         LLMRequest.update(request, {
+          generation: { maxTokens: 4_096 },
           providerOptions: { thinking: { type: "enabled", budget_tokens: 2_048 } },
         }),
       )
@@ -165,6 +167,24 @@ describe("Anthropic Messages route", () => {
       expect(enabled.body.thinking).toEqual({ type: "enabled", budget_tokens: 1_024 })
       expect(legacy.body.thinking).toEqual({ type: "enabled", budget_tokens: 2_048 })
       expect(disabled.body.thinking).toEqual({ type: "disabled" })
+    }),
+  )
+
+  it.effect("keeps the thinking budget below a smaller output limit", () =>
+    Effect.gen(function* () {
+      const compile = (maxTokens: number) =>
+        compileRequest(
+          LLMRequest.update(request, {
+            generation: { maxTokens },
+            providerOptions: { thinking: { type: "enabled", budgetTokens: 31_999 } },
+          }),
+        )
+
+      expect((yield* compile(64_000)).body.thinking).toEqual({ type: "enabled", budget_tokens: 31_999 })
+      expect((yield* compile(20_000)).body).toMatchObject({
+        max_tokens: 20_000,
+        thinking: { type: "enabled", budget_tokens: 19_999 },
+      })
     }),
   )
 

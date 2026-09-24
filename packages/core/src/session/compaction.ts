@@ -490,6 +490,7 @@ export const layer = Layer.effect(
           ...(input.instructionUpdate ? [Message.system(input.instructionUpdate)] : []),
         ],
         webSocket,
+        inputTokens: estimateTokens({ messages, resolved: context.model, context }),
       })
     }
     /** The durable transcript since the last local summary, re-expanding every native window. */

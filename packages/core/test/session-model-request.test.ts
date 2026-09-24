@@ -1,8 +1,36 @@
 import { describe, expect, test } from "bun:test"
 import { Message, ToolResultPart, Media } from "@opencode/ai"
-import { boundImages, unsupportedParts } from "@opencode/core/session/model-request"
+import { boundImages, outputLimit, unsupportedParts } from "@opencode/core/session/model-request"
 
 const capabilities = (input: string[]) => ({ tools: true, input, output: ["text"] })
+
+describe("SessionModelRequest.outputLimit", () => {
+  test("requests the catalog output limit up to the cap", () => {
+    expect(outputLimit({ context: 1_000_000, output: 128_000 }, 256_000)).toBe(128_000)
+    expect(outputLimit({ context: 200_000, output: 64_000 }, 256_000)).toBe(64_000)
+    expect(outputLimit({ context: 1_048_576, output: 1_048_576 }, 256_000)).toBe(256_000)
+    expect(outputLimit({ context: 200_000, output: 64_000 }, 32_000)).toBe(32_000)
+  })
+
+  test("falls back to 32k when the catalog has no output limit", () => {
+    expect(outputLimit({ context: 200_000, output: 0 }, 256_000)).toBe(32_000)
+  })
+
+  test("fits the limit to the room the prompt leaves in the context window", () => {
+    expect(outputLimit({ context: 1_000_000, output: 128_000 }, 256_000, 50_000)).toBe(128_000)
+    expect(outputLimit({ context: 1_000_000, output: 128_000 }, 256_000, 950_000)).toBe(45_904)
+    expect(outputLimit({ context: 128_000, output: 32_000 }, 32_000, 110_000)).toBe(13_904)
+  })
+
+  test("keeps a minimum limit when the prompt nearly fills the context window", () => {
+    expect(outputLimit({ context: 200_000, output: 64_000 }, 256_000, 199_000)).toBe(1_024)
+    expect(outputLimit({ context: 200_000, output: 512 }, 256_000, 199_000)).toBe(512)
+  })
+
+  test("ignores the prompt size when the context window is unknown", () => {
+    expect(outputLimit({ context: 0, output: 32_000 }, 256_000, 500_000)).toBe(32_000)
+  })
+})
 
 describe("SessionModelRequest.unsupportedParts", () => {
   test("replaces unsupported user media with a visible error", () => {

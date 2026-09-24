@@ -1094,14 +1094,7 @@ describe("ModelsDevPlugin", () => {
       const gateway = yield* modelState.get(Provider.ID.make("vercel"), Model.ID.make("alibaba/qwen-toggle"))
       expect(gateway?.variants).toEqual([
         { id: Model.VariantID.make("none"), settings: { enableThinking: false } },
-        {
-          id: Model.VariantID.make("high"),
-          settings: { enableThinking: true, thinkingBudget: 8000 },
-        },
-        {
-          id: Model.VariantID.make("max"),
-          settings: { enableThinking: true, thinkingBudget: 16000 },
-        },
+        { id: Model.VariantID.make("thinking"), settings: { enableThinking: true } },
       ])
 
       const gatewayNova = yield* modelState.get(Provider.ID.make("vercel"), Model.ID.make("amazon/nova-2-lite"))

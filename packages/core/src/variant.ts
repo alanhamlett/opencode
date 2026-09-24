@@ -18,7 +18,9 @@ export function resolve(model: Model.Info, supports: readonly Support[] = [{ typ
   if (!protocol) return []
   const toggle = supports.some((support) => support.type === "toggle") ? protocol(model, { type: "toggle" }) : []
   const effort = supports.find((support) => support.type === "effort")
-  const budget = supports.find((support) => support.type === "budget_tokens")
+  // Qwen budgets default to the model's maximum thinking length, and Alibaba rejects an explicit budget that is not
+  // below the output limit, so Qwen models keep the provider default instead of budget variants.
+  const budget = /qwen/i.test(modelID(model)) ? undefined : supports.find((support) => support.type === "budget_tokens")
   const main = effort ? protocol(model, effort) : budget ? protocol(model, budget) : toggle
   const variants = [...toggle.filter((variant) => variant.id === "none"), ...main]
   return variants.filter((variant, index) => variants.findIndex((other) => other.id === variant.id) === index)
